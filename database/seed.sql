@@ -1,0 +1,6 @@
+-- Initial portfolio content is loaded by the command-line script:
+--   C:\xampp\php\php.exe scripts\seed_content.php
+--
+-- Do not import this file to reset the site. The script inserts missing
+-- CV-backed rows and does not replace content edited in the dashboard.
+-- It does not add certificates or an NCRA project.

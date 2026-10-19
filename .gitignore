@@ -1,0 +1,17 @@
+/config/config.php
+/storage/logs/*.log
+/storage/cache/*
+!/storage/cache/.gitkeep
+!/storage/cache/.htaccess
+/public/uploads/projects/*
+/public/uploads/certificates/*
+/public/uploads/designs/*
+/public/uploads/profile/*
+/public/uploads/resume/*
+!/public/uploads/**/.gitkeep
+!/public/uploads/**/.htaccess
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

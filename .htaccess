@@ -1,0 +1,21 @@
+# The site is served from /public. These rules apply when Apache's
+# document root is the XAMPP htdocs folder.
+Options -Indexes
+
+<FilesMatch "^(?:\.gitignore|\.env|README\.md)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^(app|config|database|scripts|storage)(/|$) - [F,L]
+    RewriteRule \.(sql|log|ini|env)$ - [F,L]
+
+    RewriteRule ^$ public/ [R=302,L]
+</IfModule>
