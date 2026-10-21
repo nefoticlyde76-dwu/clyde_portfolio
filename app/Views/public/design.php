@@ -5,7 +5,7 @@
 <section class="page-hero">
     <div class="container site-container">
         <p class="eyebrow">Design</p>
-        <h1>Graphic design</h1>
+        <h1>Graphic <span class="accent">design</span></h1>
         <p class="lede">Published pieces only. Work without an image, and anything still in draft, is not shown here.</p>
     </div>
 </section>

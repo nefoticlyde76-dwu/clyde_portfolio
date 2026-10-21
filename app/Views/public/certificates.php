@@ -4,7 +4,7 @@
 <section class="page-hero">
     <div class="container site-container narrow-copy">
         <p class="eyebrow">Credentials</p>
-        <h1>Certificates</h1>
+        <h1>Certifi<span class="accent">cates</span></h1>
         <p class="lede">Only certificates that have been published are listed. None are added unless the record exists.</p>
     </div>
 </section>

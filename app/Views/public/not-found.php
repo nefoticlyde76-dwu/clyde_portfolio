@@ -5,7 +5,7 @@
 <section class="page-hero">
     <div class="container site-container narrow-copy">
         <p class="eyebrow">404</p>
-        <h1><?= e($heading ?? 'Page not found') ?></h1>
+        <h1>Page not <span class="accent">found</span></h1>
         <p class="lede"><?= e($message ?? 'That page is not available.') ?></p>
         <ul class="plain-list">
             <li><a href="<?= e(url('/')) ?>">Home</a></li>

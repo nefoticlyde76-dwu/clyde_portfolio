@@ -7,7 +7,11 @@
 <section class="page-hero">
     <div class="container site-container narrow-copy">
         <p class="eyebrow">About</p>
-        <h1><?= e($profile['full_name'] !== '' ? $profile['full_name'] : 'About') ?></h1>
+        <?php
+        $aboutName = $profile['full_name'] !== '' ? $profile['full_name'] : 'About';
+        $aboutParts = preg_split('/\s+/', $aboutName, 2) ?: [$aboutName];
+        ?>
+        <h1><?= e($aboutParts[0]) ?><?php if (isset($aboutParts[1])): ?> <span class="accent"><?= e($aboutParts[1]) ?></span><?php endif; ?></h1>
         <?php if ($profile['headline'] !== ''): ?>
             <p class="headline"><?= e($profile['headline']) ?></p>
         <?php endif; ?>

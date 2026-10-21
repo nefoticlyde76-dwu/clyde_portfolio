@@ -6,7 +6,9 @@ $brandParts = preg_split('/\s+/', $brand, 2) ?: [$brand];
 $links = [
     ['/projects', 'Projects'],
     ['/design', 'Design'],
+    ['/certificates', 'Certificates'],
     ['/experience', 'Experience'],
+    ['/about', 'About'],
     ['/contact', 'Contact'],
 ];
 ?>

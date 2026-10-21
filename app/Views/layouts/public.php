@@ -23,7 +23,7 @@ $personName = $profile['full_name'] !== '' ? $profile['full_name'] : $siteName;
         <meta name="description" content="<?= e($metaDescription) ?>">
     <?php endif; ?>
     <meta name="robots" content="<?= e($robots) ?>">
-    <meta name="theme-color" content="#06152B">
+    <meta name="theme-color" content="#080808">
     <?php if ($includeCanonical): ?>
         <link rel="canonical" href="<?= e($canonical) ?>">
     <?php endif; ?>
@@ -41,11 +41,11 @@ $personName = $profile['full_name'] !== '' ? $profile['full_name'] : $siteName;
     <?php endif; ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@500;600&family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 </head>
-<body>
+<body class="<?= request_path() === '/' ? 'is-home' : 'is-page' ?>">
     <a class="skip-link" href="#content">Skip to content</a>
     <?php require APP_PATH . '/Views/partials/nav.php'; ?>
     <main id="content" class="site-main">

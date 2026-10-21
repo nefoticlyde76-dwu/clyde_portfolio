@@ -8,7 +8,7 @@ $old = $old ?? [];
 <section class="page-hero">
     <div class="container site-container narrow-copy">
         <p class="eyebrow">Contact</p>
-        <h1>Contact</h1>
+        <h1>Con<span class="accent">tact</span></h1>
         <p class="lede">Send a message and it will be saved for review. This form does not send email.</p>
         <?php if ($profile['location'] !== ''): ?>
             <p class="meta-line"><?= e($profile['location']) ?></p>
