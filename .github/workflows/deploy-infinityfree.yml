@@ -1,0 +1,164 @@
+name: Deploy to InfinityFree
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infinityfree-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy PHP application
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate the FTP account directory
+        env:
+          FTP_ACCOUNT_DIR: ${{ vars.FTP_ACCOUNT_DIR }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$FTP_ACCOUNT_DIR" ]]; then
+            echo "::error::Set the repository Actions variable FTP_ACCOUNT_DIR to the parent of this domain's htdocs directory."
+            exit 1
+          fi
+
+          if [[ "$FTP_ACCOUNT_DIR" != */ ]]; then
+            echo "::error::FTP_ACCOUNT_DIR must end with a slash."
+            exit 1
+          fi
+
+          if [[ "$FTP_ACCOUNT_DIR" =~ (^|/)\.\.(/|$) || "$FTP_ACCOUNT_DIR" =~ (^|/)htdocs/?$ ]]; then
+            echo "::error::FTP_ACCOUNT_DIR must be the account/domain directory containing htdocs, not htdocs itself or a parent-traversal path."
+            exit 1
+          fi
+
+      - name: Assemble a private-safe deployment package
+        id: package
+        run: |
+          set -euo pipefail
+
+          stage_dir="$(mktemp -d "$RUNNER_TEMP/clyde-portfolio.XXXXXX")"
+          echo "directory=$stage_dir" >> "$GITHUB_OUTPUT"
+
+          mkdir -p "$stage_dir/htdocs" "$stage_dir/config"
+          cp -R app "$stage_dir/app"
+          cp config/database.php config/.htaccess "$stage_dir/config/"
+          rsync -a --exclude='/uploads/***' public/ "$stage_dir/htdocs/"
+
+          for folder in certificates designs profile projects resume; do
+            mkdir -p "$stage_dir/htdocs/uploads/$folder"
+            cp "public/uploads/$folder/.htaccess" "$stage_dir/htdocs/uploads/$folder/"
+            cp "public/uploads/$folder/.gitkeep" "$stage_dir/htdocs/uploads/$folder/"
+          done
+          cp public/uploads/.htaccess "$stage_dir/htdocs/uploads/"
+
+          mkdir -p "$stage_dir/storage/cache" "$stage_dir/storage/logs"
+          cp storage/.htaccess "$stage_dir/storage/"
+          cp storage/cache/.htaccess storage/cache/.gitkeep "$stage_dir/storage/cache/"
+          cp storage/logs/.htaccess storage/logs/.gitkeep "$stage_dir/storage/logs/"
+
+          test -f "$stage_dir/htdocs/index.php"
+          test -f "$stage_dir/htdocs/.htaccess"
+          test -f "$stage_dir/app/Core/bootstrap.php"
+          test -f "$stage_dir/config/database.php"
+          test -f "$stage_dir/storage/logs/.htaccess"
+
+          test ! -e "$stage_dir/config/config.php"
+          test ! -e "$stage_dir/config/config.example.php"
+          test ! -e "$stage_dir/database"
+          test ! -e "$stage_dir/scripts"
+          test ! -e "$stage_dir/docs"
+          test ! -e "$stage_dir/.git"
+          test ! -e "$stage_dir/.github"
+
+          if find "$stage_dir/htdocs/uploads" -type f ! -name '.htaccess' ! -name '.gitkeep' -print -quit | grep -q .; then
+            echo "::error::The deployment package contains uploaded media."
+            exit 1
+          fi
+
+          if find "$stage_dir" -type f \( -name '.env' -o -name '.env.*' -o -name '*.sql' -o -name '*.log' \) -print -quit | grep -q .; then
+            echo "::error::The deployment package contains an environment file, database dump, or log."
+            exit 1
+          fi
+
+          echo "Deployment package assembled with private application source outside htdocs."
+
+      - name: Preview FTP changes
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          security: strict
+          local-dir: ${{ steps.package.outputs.directory }}/
+          server-dir: ${{ vars.FTP_ACCOUNT_DIR }}
+          dangerous-clean-slate: false
+          dry-run: true
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.env
+            **/.env.*
+            **/config/config.php
+            **/config/config.example.php
+            **/database/**
+            **/scripts/**
+            **/docs/**
+            **/storage/logs/*.log
+            **/htdocs/uploads/**/*.jpg
+            **/htdocs/uploads/**/*.jpeg
+            **/htdocs/uploads/**/*.png
+            **/htdocs/uploads/**/*.gif
+            **/htdocs/uploads/**/*.webp
+            **/htdocs/uploads/**/*.pdf
+            **/htdocs/uploads/**/*.doc
+            **/htdocs/uploads/**/*.docx
+
+      - name: Deploy to InfinityFree
+        if: vars.FTP_DEPLOY_ENABLED == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          security: strict
+          local-dir: ${{ steps.package.outputs.directory }}/
+          server-dir: ${{ vars.FTP_ACCOUNT_DIR }}
+          dangerous-clean-slate: false
+          dry-run: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.env
+            **/.env.*
+            **/config/config.php
+            **/config/config.example.php
+            **/database/**
+            **/scripts/**
+            **/docs/**
+            **/storage/logs/*.log
+            **/htdocs/uploads/**/*.jpg
+            **/htdocs/uploads/**/*.jpeg
+            **/htdocs/uploads/**/*.png
+            **/htdocs/uploads/**/*.gif
+            **/htdocs/uploads/**/*.webp
+            **/htdocs/uploads/**/*.pdf
+            **/htdocs/uploads/**/*.doc
+            **/htdocs/uploads/**/*.docx

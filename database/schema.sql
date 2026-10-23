@@ -1,12 +1,6 @@
 -- Clyde Nefoti portfolio schema
--- Import this file once from MySQL or phpMyAdmin.
+-- Select the target database in MySQL or phpMyAdmin before importing this file.
 -- Content tables are independent, so they do not use foreign keys.
-
-CREATE DATABASE IF NOT EXISTS clyde_portfolio
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE clyde_portfolio;
 
 CREATE TABLE admins (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,

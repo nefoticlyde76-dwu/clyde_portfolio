@@ -46,7 +46,7 @@ function url(string $path = ''): string
 function asset(string $path): string
 {
     $relative = 'assets/' . ltrim($path, '/');
-    $absolute = dirname(__DIR__, 2) . '/public/' . $relative;
+    $absolute = PUBLIC_PATH . '/' . $relative;
     $url = url($relative);
     if (!is_file($absolute)) {
         return $url;
@@ -241,8 +241,8 @@ function media_url(?string $path): ?string
         return null;
     }
 
-    $uploadsRoot = realpath(ROOT_PATH . '/public/uploads');
-    $file = realpath(ROOT_PATH . '/public/' . $path);
+    $uploadsRoot = realpath(PUBLIC_PATH . '/uploads');
+    $file = realpath(PUBLIC_PATH . '/' . $path);
     if ($uploadsRoot === false || $file === false || !is_file($file)) {
         return null;
     }
@@ -678,8 +678,8 @@ function upload_absolute(?string $relative): ?string
         return null;
     }
 
-    $uploadsRoot = realpath(ROOT_PATH . '/public/uploads');
-    $file = realpath(ROOT_PATH . '/public/' . $relative);
+    $uploadsRoot = realpath(PUBLIC_PATH . '/uploads');
+    $file = realpath(PUBLIC_PATH . '/' . $relative);
     if ($uploadsRoot === false || $file === false || !is_file($file)) {
         return null;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Router;
 
+define('PUBLIC_PATH', __DIR__);
 require dirname(__DIR__) . '/app/Core/bootstrap.php';
 
 $router = new Router();

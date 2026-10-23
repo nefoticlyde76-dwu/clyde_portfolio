@@ -72,7 +72,7 @@ final class Upload
             return ['path' => null, 'error' => 'The file could not be stored.'];
         }
 
-        $directory = ROOT_PATH . '/public/uploads/' . $folder;
+        $directory = PUBLIC_PATH . '/uploads/' . $folder;
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
             return ['path' => null, 'error' => 'The file could not be stored.'];
         }

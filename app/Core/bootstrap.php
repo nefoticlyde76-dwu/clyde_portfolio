@@ -10,6 +10,9 @@ declare(strict_types=1);
 define('ROOT_PATH', dirname(__DIR__, 2));
 define('APP_PATH', ROOT_PATH . '/app');
 define('STORAGE_PATH', ROOT_PATH . '/storage');
+if (!defined('PUBLIC_PATH')) {
+    define('PUBLIC_PATH', ROOT_PATH . '/public');
+}
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');

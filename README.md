@@ -19,15 +19,16 @@ Local portfolio and private content system for XAMPP. The public site reads publ
 
    Edit only `config\config.php`. Leave `config\config.example.php` unchanged.
 
-3. Create the database and tables. In PowerShell:
+3. Create the database, then create its tables. In PowerShell:
 
    ```text
-   C:\xampp\mysql\bin\mysql.exe -u root < database\schema.sql
+   C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE clyde_portfolio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+   C:\xampp\mysql\bin\mysql.exe -u root clyde_portfolio < database\schema.sql
    ```
 
-   If the MySQL root account has a password, add `-p` and enter it when asked.
+   If the MySQL root account has a password, add `-p` to each command and enter it when asked.
 
-   phpMyAdmin alternative: open `http://localhost/phpmyadmin`, choose **Import**, and import `database\schema.sql`. The script creates the `clyde_portfolio` database.
+   phpMyAdmin alternative: create and select the `clyde_portfolio` database, choose **Import**, and import `database\schema.sql`.
 
 4. Load the CV-backed starting content. The script inserts missing records and does not replace text you later edit in the dashboard:
 
