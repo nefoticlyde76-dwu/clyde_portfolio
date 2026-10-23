@@ -87,19 +87,10 @@ $icons = [
                     <?= e($profile['location']) ?>
                 </p>
             <?php endif; ?>
-        </div>
-        <div class="reel-portrait">
-            <?php if ($profile['profile_image_url'] !== ''): ?>
-                <img src="<?= e($profile['profile_image_url']) ?>" alt="<?= e('Portrait of ' . $displayName) ?>">
-            <?php else: ?>
-                <div class="portrait-placeholder" role="img" aria-label="Portrait placeholder. A profile photo has not been added.">
-                    <svg viewBox="0 0 320 460" aria-hidden="true">
-                        <ellipse cx="160" cy="148" rx="62" ry="72"></ellipse>
-                        <path d="M48 430c8-92 48-138 112-138s104 46 112 138"></path>
-                    </svg>
-                    <p>Portrait not added</p>
-                </div>
-            <?php endif; ?>
+            <div class="reel-actions">
+                <a class="reel-action-primary" href="<?= e(url('/projects')) ?>">Explore projects <span aria-hidden="true">→</span></a>
+                <a class="reel-action-secondary" href="<?= e(url('/contact')) ?>">Get in touch</a>
+            </div>
         </div>
         <div class="reel-aside">
             <p class="reel-callout"><span aria-hidden="true">+</span> <?= e($callout) ?></p>

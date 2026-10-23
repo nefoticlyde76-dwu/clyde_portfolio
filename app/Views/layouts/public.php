@@ -23,7 +23,7 @@ $personName = $profile['full_name'] !== '' ? $profile['full_name'] : $siteName;
         <meta name="description" content="<?= e($metaDescription) ?>">
     <?php endif; ?>
     <meta name="robots" content="<?= e($robots) ?>">
-    <meta name="theme-color" content="#080808">
+    <meta name="theme-color" content="#09090B">
     <?php if ($includeCanonical): ?>
         <link rel="canonical" href="<?= e($canonical) ?>">
     <?php endif; ?>
