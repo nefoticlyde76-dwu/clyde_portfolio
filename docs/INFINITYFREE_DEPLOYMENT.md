@@ -8,49 +8,41 @@ This guide deploys the existing PHP MVC application without server-side Composer
 - Required PHP extensions: `pdo_mysql`, `mbstring`, `fileinfo`, and `session`. The app also uses standard PHP core functionality such as `json`, `filter`, `hash`, and `random_bytes`.
 - The schema uses InnoDB, `utf8mb4`, `DATETIME` current-timestamp defaults, and standard indexes. Use **MySQL 5.7 or newer** or **MariaDB 10.2 or newer**.
 - The repository has no Composer manifest, `vendor/` directory, or third-party PHP packages. There is nothing to install with Composer; upload the application PHP files as-is.
+- The workflow installs `lftp` on its temporary GitHub-hosted Ubuntu runner for FTPS transfers; it does not require a shell, Composer, or command-line tools on InfinityFree.
 - The hosting account's exact PHP/MySQL versions and extension availability cannot be read from this local checkout. Check the account's PHP selector / PHP information and database panel before deploying. Do not continue if any minimum above is unavailable.
 - Apache must allow `.htaccess` and `mod_rewrite`. The included `public/.htaccess` routes non-file requests to `index.php`.
 
 ## Exact upload layout
 
-In the hosting account, keep private application files **beside** (not inside) the `htdocs` document root. For example:
+InfinityFree requires website files to be inside the domain's `htdocs` directory. The application source and runtime data therefore live below the document root, protected from direct HTTP access by Apache rules:
 
 ```text
-account-root/
-|-- app/                       # application source; private
-|-- config/                    # configuration; private
-|   |-- database.php
-|   |-- .htaccess
-|   `-- config.php             # create for production; never commit
-|-- storage/                   # logs and cache; private
-|   |-- cache/
-|   `-- logs/
-`-- htdocs/                    # domain document root
-    |-- .htaccess              # upload from project public/.htaccess
-    |-- index.php              # upload from project public/index.php
-    |-- assets/
-    `-- uploads/
-        |-- certificates/
-        |-- designs/
-        |-- profile/
-        |-- projects/
-        `-- resume/
+FTP account root/
+`-- clyde-nefoti.wuaze.com/
+   `-- htdocs/                 # FTP target and domain document root
+       |-- .htaccess           # router and private-path protections
+       |-- index.php
+       |-- app/                # PHP source; direct HTTP requests denied
+       |-- config/             # config/database.php and private config.php; denied
+       |-- storage/            # logs/cache; denied
+       |-- assets/
+       `-- uploads/            # production uploads preserved by deployments
 ```
 
-The names `account-root` and `htdocs` are illustrative; use the actual folder shown in the hosting File Manager. The workflow uploads `app/`, `config/database.php`, `config/.htaccess`, and `storage/` beside `htdocs/`, and the contents of the repository's `public/` directory into `htdocs/` (including hidden `.htaccess` files). Create the private `config/config.php` separately through the hosting File Manager. The database schema, migrations, and scripts stay in the repository; they are not part of the deployment package. The front controller expects `app/` at the parent level.
+InfinityFree's [FTP guide](https://forum.infinityfree.com/t/how-to-upload-files-with-ftp/49306) gives domain-specific paths such as `/example.com/htdocs`. For this site, the workflow defaults to `/clyde-nefoti.wuaze.com/htdocs/`, not a server Unix home directory. Verify the FTP-visible path for this exact domain in the account's FTP client/File Manager before enabling uploads. If the FTP account opens directly inside this domain's folder, set the repository Actions variable `FTP_TARGET_DIR` to `./htdocs/` instead. The account's FTP listing is not available from this repository, so the default must be confirmed before enabling live transfers.
 
-Do **not** upload the entire repository into `htdocs/`. In particular, do not put `app/`, `config/`, `database/`, `scripts/`, `storage/`, `docs/`, the repository-root `.htaccess`, README files, `.git/`, database exports, or local logs in the document root. The root `.htaccess` is for the local XAMPP layout, where the project is under `htdocs/clyde-portfolio/` and URLs include `/public`; it is not needed in the recommended InfinityFree layout. The deployed copy of `public/.htaccess` becomes `htdocs/.htaccess` and should be preserved.
+The workflow packages the app under the selected FTP target (which is `htdocs`), copying `app/`, `config/`, and `storage/` alongside the contents of `public/`. `public/.htaccess` becomes the document root's `.htaccess`. Its rules deny HTTP requests to `/app`, `/config`, and `/storage`, and block script-like extensions under `/uploads`; each private directory also has its own deny rule. PHP filesystem includes continue to work. The front controller supports both this layout and local XAMPP, where `app/` is a sibling of `public/`.
 
-The deployed front controller now uses its own directory for public assets and uploads. `app/`, `config/`, database files, scripts, and logs remain outside the web root; production credentials belong only in the private `config/config.php`.
+The deployment package includes `config/config.example.php` but never `config/config.php`. Create the latter through the hosting File Manager with production database settings before live deployment. It is under `config/` and protected by both the directory `.htaccess` and root rewrite rule. Database schema, migrations, scripts, docs, `.git`, database exports, local logs, and local upload media are not packaged.
 
 ## Automatic deployment with GitHub Actions
 
-The repository's deployment branch is `main`. The workflow at `.github/workflows/deploy-infinityfree.yml` runs on pushes to `main` and on manual dispatch. It packages the app source beside `htdocs`, places only the contents of `public/` in `htdocs/`, and includes only upload protection files and empty placeholders. It does not package `config/config.php`, `config/config.example.php`, database/schema files, scripts, docs, local uploads, logs, or Git metadata. No Composer packages are needed.
+The repository's deployment branch is `main`. The workflow at `.github/workflows/deploy-infinityfree.yml` runs a dry run on pushes to `main` and on manual dispatch. It packages the app and runtime directories inside the domain's `htdocs`; it does not package `config/config.php`, database/schema files, scripts, docs, local uploads, logs, or Git metadata. No Composer packages are needed.
 
-The FTP destination is account-specific: [InfinityFree's FTP guide](https://forum.infinityfree.com/t/how-to-upload-files-with-ftp/49306) documents domain-specific paths such as `/example.com/htdocs`, and its [website migration guide](https://forum.infinityfree.com/t/how-to-migrate-your-website-to-infinityfree/49315) describes uploading website files to `htdocs`. In the repository's **Settings → Secrets and variables → Actions → Variables**, create:
+In the repository's **Settings → Secrets and variables → Actions → Variables**, configure:
 
-- `FTP_ACCOUNT_DIR`: the exact FTP path to the **parent directory containing this site's `htdocs`**, ending in `/`. For example, use `./` if the FTP account's starting directory contains `htdocs`, or `/example.com/` if the account shows `/example.com/htdocs`. Do not set this to `htdocs/`; the package contains `htdocs/` as a child, with private app directories beside it.
-- `FTP_DEPLOY_ENABLED`: set to `true` only after the first dry-run preview is reviewed and the production config file exists on the host.
+- `FTP_TARGET_DIR`: optional override for the FTP-visible target directory. It defaults to `/clyde-nefoti.wuaze.com/htdocs/`; the only supported alternate is `./htdocs/` when the FTP account opens in this domain's directory. Verify in the FTP account before enabling live upload; never use a server Unix home path.
+- `FTP_DEPLOY_ENABLED`: leave unset or not equal to `true` initially. The workflow only runs a dry run unless explicitly set to `true`.
 
 Create these **repository Actions secrets** in the same page:
 
@@ -58,17 +50,19 @@ Create these **repository Actions secrets** in the same page:
 - `FTP_USERNAME`: the hosting account's FTP username.
 - `FTP_PASSWORD`: the FTP password from the hosting account/client-area details; never put it in workflow YAML.
 
-The action uses explicit FTPS on port 21 with certificate validation. [InfinityFree forum guidance](https://forum.infinityfree.com/t/how-can-we-use-ssh/79234) states the `ftpupload.net` hostname has the FTP TLS certificate; use the hostname matching the server certificate. SFTP/SSH is not used. The workflow uses the maintained [FTP-Deploy-Action](https://github.com/SamKirkland/FTP-Deploy-Action) release `v4.4.0` and runs a dry-run preview first. Actual uploads stay disabled until `FTP_DEPLOY_ENABLED` is exactly `true`. When enabled, it uploads only the staged app and public files; dangerous clean-slate deletion is disabled. The action's sync state can still remove files it previously deployed when those tracked source files are later removed, but it does not clean the whole hosting directory. Keep production uploads and `config/config.php` out of the staged package.
+The workflow uses explicit FTPS with certificate validation through `lftp`. The FTP hostname shown in the account's FTP details is normally `ftpupload.net`; use the hostname matching the server certificate. SFTP/SSH is not used. It previews an upload-only sync before any live transfer. Unlike a mirror action that tracks removals, the upload command never deletes remote files. It excludes all `.htaccess` files (to preserve host-specific rules), `config/config.php`, storage logs/cache data, and local upload media. Other existing files with names in the package can be overwritten when their local versions change.
 
 Before enabling uploads:
 
-1. In InfinityFree's account File Manager, verify the FTP directory for the intended domain and identify the parent of its `htdocs`. Set `FTP_ACCOUNT_DIR` to that exact parent; do not guess based only on the domain name.
-2. Create `config/config.php` in the private account directory beside `htdocs` with the production database settings described above. The workflow deliberately preserves this file and never uploads local credentials.
-3. Review the current hosting files and make a backup. The workflow does not delete unrelated files, but an existing default index file could take precedence over `index.php`; resolve that deliberately before enabling deploys.
-4. Add the three secrets and the `FTP_ACCOUNT_DIR` variable. Run the workflow manually while `FTP_DEPLOY_ENABLED` is unset or not `true`; inspect the dry-run output and confirm it targets the correct domain/account directory.
-5. Only after the dry run shows the expected app/source/htdocs layout, set `FTP_DEPLOY_ENABLED` to `true`. Subsequent pushes to `main` then upload automatically. Each run previews its changes before performing the FTP sync.
+1. In InfinityFree's FTP account, verify the intended domain path is `clyde-nefoti.wuaze.com/htdocs`. Set `FTP_TARGET_DIR=./htdocs/` only if the FTP account already opens inside the domain's directory; do not use a Unix home directory.
+2. Add the three secrets and verify the FTP server name and target path.
+3. Create `config/config.php` inside the target's `config/` directory with the production database settings below. The workflow never includes or overwrites this file.
+4. Review and back up existing hosting files. Check for a default `index.html` that could take precedence over `index.php`.
+5. In the hosting File Manager, merge the required rules from the repository's `public/.htaccess` and private-directory `.htaccess` files with any existing host rules. The workflow intentionally never uploads `.htaccess`; ensure the merged root rules deny `/app`, `/config`, and `/storage` and block executable upload extensions before exposing runtime files below `htdocs`.
+6. Run the workflow manually with `confirm_deploy` unchecked and `FTP_DEPLOY_ENABLED` unset/not `true`. Review the target and every proposed upload. The dry run does not change hosting files.
+7. After confirming the target and package, creating `config/config.php`, and installing the required access rules, set `FTP_DEPLOY_ENABLED` to `true`. On manual runs, also check `confirm_deploy`; pushes to `main` then upload automatically. Every run previews the upload before the gated transfer.
 
-The workflow does not install server-side dependencies, run migrations, import SQL, transfer database content, or upload administrator/contact data. Provision the production schema, account, and initial administrator separately as described above. Keep local `storage/logs/` and `public/uploads/` media out of source control and out of the deployment package.
+The workflow does not install server-side dependencies, run migrations, import SQL, transfer database content, or upload administrator/contact data. Provision the production schema, account, and initial administrator separately as described above. No remote files are deleted; production uploads, database content, logs, cache, and `config/config.php` are not part of the upload package.
 
 ## Configure the production database
 
@@ -77,7 +71,7 @@ The workflow does not install server-side dependencies, run migrations, import S
 3. The schema creates the empty tables `admins`, `profile_settings`, `projects`, `certificates`, `design_items`, `skills`, `experiences`, and `contact_messages`. It contains no administrator, contact messages, or seeded data. `database/seed.sql` is explanatory only; `scripts/seed_content.php` is a local CLI script and is not a host-side setup method.
 4. If migrating portfolio content, first create the production schema above, then export **data only** from a reviewed local database for these content tables: `profile_settings`, `projects`, `certificates`, `design_items`, `skills`, and `experiences`. Do not export `admins` or `contact_messages`; that avoids copying test accounts and development contact messages. Review the selected rows before importing. Do not import old schema dumps over the fresh production schema.
 5. If exported rows reference uploaded images or documents, transfer only those intended public files into the matching `htdocs/uploads/{projects,certificates,designs,profile,resume}/` folder. Do not copy local configuration, database backups, logs, sessions, cache files, or unrelated uploads.
-6. Create `config/config.php` in the private `account-root/config/` directory. Start from `config/config.example.php` and set:
+6. Create `htdocs/config/config.php` through the hosting File Manager. Start from `config/config.example.php` and set:
 
    ```php
    'app_name' => 'Clyde Nefoti',
@@ -117,9 +111,9 @@ There is no public registration or web setup script. Create the account directly
 2. Set `base_url` in the private config to the final `https://` origin. The app then marks its session cookie `Secure`, `HttpOnly`, and `SameSite=Lax`; it also enables strict session mode and uses cookie-only sessions.
 3. Enable the host's HTTPS redirect option if available. Only add an Apache HTTPS rewrite after confirming the certificate is active and the host's HTTPS/proxy behavior; do not enable a redirect that causes a loop.
 4. PHP stores session data at the host's configured `session.save_path`; the app does not put session files under the web root. Confirm sessions are enabled and the host-managed session storage is available. Do not override it to a public directory.
-5. Ensure `storage/logs/`, `storage/cache/`, and all five `htdocs/uploads/` subdirectories exist and are writable by PHP. Use the host's normal directory permission (typically `0755`, or its documented writable setting); do not use world-writable `0777`. Keep `storage/` outside `htdocs`.
+5. Ensure `htdocs/storage/logs/`, `htdocs/storage/cache/`, and all five `htdocs/uploads/` subdirectories exist and are writable by PHP. Use the host's normal directory permission (typically `0755`, or its documented writable setting); do not use world-writable `0777`. Direct web requests to storage remain denied.
 6. Upload validation allows image files up to **5 MiB** and PDFs up to **8 MiB**. The hosting PHP `upload_max_filesize` must be at least 8 MiB and `post_max_size` must exceed 8 MiB; shared hosting may impose lower caps. Check the control panel's actual limits. If the account does not permit these limits, the app will report upload errors at the server limit.
-7. Uploaded files are stored under `htdocs/uploads/`. Existing per-directory `.htaccess` files disable script execution and block script-like extensions; retain them. Upload directories must not be executable by PHP.
+7. Uploaded files are stored under `htdocs/uploads/`. The htdocs root rewrite rule blocks requests to script-like extensions under uploads; retain any existing per-directory `.htaccess` protections. Upload directories must not be executable by PHP.
 
 ## Deployment tests
 
@@ -130,7 +124,7 @@ After deployment, run these checks in a browser:
 3. Visit `/admin/login`, sign in, navigate the dashboard, then sign out. Confirm the session cookie has `Secure`, `HttpOnly`, and `SameSite=Lax` over HTTPS, and that a page refresh preserves the session.
 4. Submit a disposable contact-form test and confirm it appears in the admin inbox; delete the test message after verification.
 5. As an administrator, test one permitted image upload and one permitted PDF upload with draft/test content, then remove the test content and uploaded files. Also test an unsupported extension and a file over the application limit; these should be rejected.
-6. Confirm requests for `/app/`, `/config/config.php`, `/database/schema.sql`, `/scripts/create_admin.php`, `/storage/logs/app.log`, `/docs/INFINITYFREE_DEPLOYMENT.md`, and `/.git/config` return 403/404 and never display source, configuration, logs, or docs. With the recommended layout these paths are outside the document root.
+6. Confirm requests for `/app/`, `/config/config.php`, `/database/schema.sql`, `/scripts/create_admin.php`, `/storage/logs/app.log`, `/docs/INFINITYFREE_DEPLOYMENT.md`, and `/.git/config` return 403/404 and never display source, configuration, logs, or docs. `app`, `config`, and `storage` are inside `htdocs` but are denied by Apache rules; the other paths are not included in the deployment package.
 7. Review the site's pages and admin screens for PHP errors, empty media links, database failures, and missing writable-directory warnings. Check the private `storage/logs/` files through the host file manager if a request fails.
 
 ## Unresolved account-specific checks

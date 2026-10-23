@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: Allow live upload after reviewing this run's dry run
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -22,28 +28,19 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Validate the FTP account directory
+      - name: Validate the FTP target directory
         env:
-          FTP_ACCOUNT_DIR: ${{ vars.FTP_ACCOUNT_DIR }}
+          FTP_TARGET_DIR: ${{ vars.FTP_TARGET_DIR || '/clyde-nefoti.wuaze.com/htdocs/' }}
         run: |
           set -euo pipefail
 
-          if [[ -z "$FTP_ACCOUNT_DIR" ]]; then
-            echo "::error::Set the repository Actions variable FTP_ACCOUNT_DIR to the parent of this domain's htdocs directory."
+          if [[ "$FTP_TARGET_DIR" != "/clyde-nefoti.wuaze.com/htdocs/" &&
+                "$FTP_TARGET_DIR" != "./htdocs/" ]]; then
+            echo "::error::FTP_TARGET_DIR must be /clyde-nefoti.wuaze.com/htdocs/ or ./htdocs/ as shown by the FTP account."
             exit 1
           fi
 
-          if [[ "$FTP_ACCOUNT_DIR" != */ ]]; then
-            echo "::error::FTP_ACCOUNT_DIR must end with a slash."
-            exit 1
-          fi
-
-          if [[ "$FTP_ACCOUNT_DIR" =~ (^|/)\.\.(/|$) || "$FTP_ACCOUNT_DIR" =~ (^|/)htdocs/?$ ]]; then
-            echo "::error::FTP_ACCOUNT_DIR must be the account/domain directory containing htdocs, not htdocs itself or a parent-traversal path."
-            exit 1
-          fi
-
-      - name: Assemble a private-safe deployment package
+      - name: Assemble the htdocs deployment package
         id: package
         run: |
           set -euo pipefail
@@ -51,38 +48,35 @@ jobs:
           stage_dir="$(mktemp -d "$RUNNER_TEMP/clyde-portfolio.XXXXXX")"
           echo "directory=$stage_dir" >> "$GITHUB_OUTPUT"
 
-          mkdir -p "$stage_dir/htdocs" "$stage_dir/config"
-          cp -R app "$stage_dir/app"
-          cp config/database.php config/.htaccess "$stage_dir/config/"
-          rsync -a --exclude='/uploads/***' public/ "$stage_dir/htdocs/"
-
-          for folder in certificates designs profile projects resume; do
-            mkdir -p "$stage_dir/htdocs/uploads/$folder"
-            cp "public/uploads/$folder/.htaccess" "$stage_dir/htdocs/uploads/$folder/"
-            cp "public/uploads/$folder/.gitkeep" "$stage_dir/htdocs/uploads/$folder/"
-          done
-          cp public/uploads/.htaccess "$stage_dir/htdocs/uploads/"
-
-          mkdir -p "$stage_dir/storage/cache" "$stage_dir/storage/logs"
+          mkdir -p "$stage_dir/app" "$stage_dir/config" "$stage_dir/storage/cache" "$stage_dir/storage/logs"
+          cp -R app/. "$stage_dir/app/"
+          cp config/.htaccess config/config.example.php config/database.php "$stage_dir/config/"
           cp storage/.htaccess "$stage_dir/storage/"
           cp storage/cache/.htaccess storage/cache/.gitkeep "$stage_dir/storage/cache/"
           cp storage/logs/.htaccess storage/logs/.gitkeep "$stage_dir/storage/logs/"
+          rsync -a --exclude='/uploads/***' public/ "$stage_dir/"
 
-          test -f "$stage_dir/htdocs/index.php"
-          test -f "$stage_dir/htdocs/.htaccess"
+          for folder in certificates designs profile projects resume; do
+            mkdir -p "$stage_dir/uploads/$folder"
+            cp "public/uploads/$folder/.htaccess" "$stage_dir/uploads/$folder/"
+            cp "public/uploads/$folder/.gitkeep" "$stage_dir/uploads/$folder/"
+          done
+          cp public/uploads/.htaccess "$stage_dir/uploads/"
+
+          test -f "$stage_dir/index.php"
+          test -f "$stage_dir/.htaccess"
           test -f "$stage_dir/app/Core/bootstrap.php"
           test -f "$stage_dir/config/database.php"
           test -f "$stage_dir/storage/logs/.htaccess"
 
           test ! -e "$stage_dir/config/config.php"
-          test ! -e "$stage_dir/config/config.example.php"
           test ! -e "$stage_dir/database"
           test ! -e "$stage_dir/scripts"
           test ! -e "$stage_dir/docs"
           test ! -e "$stage_dir/.git"
           test ! -e "$stage_dir/.github"
 
-          if find "$stage_dir/htdocs/uploads" -type f ! -name '.htaccess' ! -name '.gitkeep' -print -quit | grep -q .; then
+          if find "$stage_dir/uploads" -type f ! -name '.gitkeep' -print -quit | grep -q .; then
             echo "::error::The deployment package contains uploaded media."
             exit 1
           fi
@@ -92,73 +86,65 @@ jobs:
             exit 1
           fi
 
-          echo "Deployment package assembled with private application source outside htdocs."
+          echo "Deployment package assembled for the domain's htdocs directory."
 
-      - name: Preview FTP changes
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          security: strict
-          local-dir: ${{ steps.package.outputs.directory }}/
-          server-dir: ${{ vars.FTP_ACCOUNT_DIR }}
-          dangerous-clean-slate: false
-          dry-run: true
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/.env
-            **/.env.*
-            **/config/config.php
-            **/config/config.example.php
-            **/database/**
-            **/scripts/**
-            **/docs/**
-            **/storage/logs/*.log
-            **/htdocs/uploads/**/*.jpg
-            **/htdocs/uploads/**/*.jpeg
-            **/htdocs/uploads/**/*.png
-            **/htdocs/uploads/**/*.gif
-            **/htdocs/uploads/**/*.webp
-            **/htdocs/uploads/**/*.pdf
-            **/htdocs/uploads/**/*.doc
-            **/htdocs/uploads/**/*.docx
+      - name: Preview FTP upload
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_TARGET_DIR: ${{ vars.FTP_TARGET_DIR || '/clyde-nefoti.wuaze.com/htdocs/' }}
+          FTP_DEPLOY_ENABLED: ${{ vars.FTP_DEPLOY_ENABLED }}
+          CONFIRM_DEPLOY: ${{ inputs.confirm_deploy }}
+          PACKAGE_DIR: ${{ steps.package.outputs.directory }}
+        run: |
+          set -euo pipefail
 
-      - name: Deploy to InfinityFree
-        if: vars.FTP_DEPLOY_ENABLED == 'true'
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          security: strict
-          local-dir: ${{ steps.package.outputs.directory }}/
-          server-dir: ${{ vars.FTP_ACCOUNT_DIR }}
-          dangerous-clean-slate: false
-          dry-run: false
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/.env
-            **/.env.*
-            **/config/config.php
-            **/config/config.example.php
-            **/database/**
-            **/scripts/**
-            **/docs/**
-            **/storage/logs/*.log
-            **/htdocs/uploads/**/*.jpg
-            **/htdocs/uploads/**/*.jpeg
-            **/htdocs/uploads/**/*.png
-            **/htdocs/uploads/**/*.gif
-            **/htdocs/uploads/**/*.webp
-            **/htdocs/uploads/**/*.pdf
-            **/htdocs/uploads/**/*.doc
-            **/htdocs/uploads/**/*.docx
+          if [[ -z "$FTP_SERVER" || -z "$FTP_USERNAME" || -z "$LFTP_PASSWORD" ]]; then
+            echo "::error::Set the FTP_SERVER, FTP_USERNAME, and FTP_PASSWORD repository Actions secrets."
+            exit 1
+          fi
+
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y lftp
+
+          exclusions=(
+            --exclude-glob '*.htaccess'
+            --exclude-glob 'config/config.php'
+            --exclude-glob 'storage/cache/*'
+            --exclude-glob 'storage/logs/*.log'
+          )
+
+          echo "FTP dry run target: $FTP_SERVER:$FTP_TARGET_DIR"
+          printf 'Package file: %s\n' "$(cd "$PACKAGE_DIR" && find . -type f -print | sort)"
+
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<LFTP
+          set cmd:fail-exit yes
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate yes
+          cd "$FTP_TARGET_DIR"
+          mirror --reverse --verbose --no-perms --dry-run "${exclusions[@]}" "$PACKAGE_DIR" .
+          LFTP
+
+          deploy_requested=false
+          if [[ "$FTP_DEPLOY_ENABLED" == "true" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" != "workflow_dispatch" || "$CONFIRM_DEPLOY" == "true" ]]; then
+              deploy_requested=true
+            fi
+          fi
+
+          if [[ "$deploy_requested" != "true" ]]; then
+            echo "Live upload is disabled. Review this dry run before setting FTP_DEPLOY_ENABLED=true."
+            exit 0
+          fi
+
+          echo "Uploading package without remote deletion."
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<LFTP
+          set cmd:fail-exit yes
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate yes
+          cd "$FTP_TARGET_DIR"
+          mirror --reverse --verbose --no-perms "${exclusions[@]}" "$PACKAGE_DIR" .
+          LFTP

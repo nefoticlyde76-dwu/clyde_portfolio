@@ -3,6 +3,10 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Runtime source and private data live under htdocs on shared hosting.
+    RewriteRule ^(app|config|storage)(/|$) - [F,L]
+    RewriteRule ^uploads/.*\.(php[0-9]?|phtml|phar|pht|phps|cgi|pl|py|asp|aspx|sh|exe|dll|bat|cmd)(/|$) - [F,L,NC]
+
     # Real files, including uploaded images and assets, are served directly.
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
