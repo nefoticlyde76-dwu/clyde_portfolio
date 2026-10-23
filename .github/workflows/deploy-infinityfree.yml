@@ -54,7 +54,17 @@ jobs:
           cp storage/.htaccess "$stage_dir/storage/"
           cp storage/cache/.htaccess storage/cache/.gitkeep "$stage_dir/storage/cache/"
           cp storage/logs/.htaccess storage/logs/.gitkeep "$stage_dir/storage/logs/"
-          rsync -a --exclude='/uploads/***' public/ "$stage_dir/"
+          rsync -a --exclude='/uploads' --exclude='/uploads/***' public/ "$stage_dir/"
+
+          case "$stage_dir" in
+            "$RUNNER_TEMP"/clyde-portfolio.*) ;;
+            *)
+              echo "::error::Refusing to rebuild uploads outside the temporary deployment directory."
+              exit 1
+              ;;
+          esac
+
+          rm -rf -- "$stage_dir/uploads"
 
           for folder in certificates designs profile projects resume; do
             mkdir -p "$stage_dir/uploads/$folder"
@@ -76,8 +86,12 @@ jobs:
           test ! -e "$stage_dir/.git"
           test ! -e "$stage_dir/.github"
 
-          if find "$stage_dir/uploads" -type f ! -name '.gitkeep' -print -quit | grep -q .; then
-            echo "::error::The deployment package contains uploaded media."
+          printf 'Staged deployment package paths (relative only):\n'
+          (cd "$stage_dir" && find . -type f -printf '%P\n' | sort)
+
+          if find "$stage_dir/uploads" -type f ! \( -name '.gitkeep' -o -name '.htaccess' \) -print -quit | grep -q .; then
+            echo "::error::The deployment package contains files other than upload protection rules and placeholders:"
+            find "$stage_dir/uploads" -type f ! \( -name '.gitkeep' -o -name '.htaccess' \) -printf '%P\n'
             exit 1
           fi
 

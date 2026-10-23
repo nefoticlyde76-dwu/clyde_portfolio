@@ -31,7 +31,7 @@ FTP account root/
 
 InfinityFree's [FTP guide](https://forum.infinityfree.com/t/how-to-upload-files-with-ftp/49306) gives domain-specific paths such as `/example.com/htdocs`. For this site, the workflow defaults to `/clyde-nefoti.wuaze.com/htdocs/`, not a server Unix home directory. Verify the FTP-visible path for this exact domain in the account's FTP client/File Manager before enabling uploads. If the FTP account opens directly inside this domain's folder, set the repository Actions variable `FTP_TARGET_DIR` to `./htdocs/` instead. The account's FTP listing is not available from this repository, so the default must be confirmed before enabling live transfers.
 
-The workflow packages the app under the selected FTP target (which is `htdocs`), copying `app/`, `config/`, and `storage/` alongside the contents of `public/`. `public/.htaccess` becomes the document root's `.htaccess`. Its rules deny HTTP requests to `/app`, `/config`, and `/storage`, and block script-like extensions under `/uploads`; each private directory also has its own deny rule. PHP filesystem includes continue to work. The front controller supports both this layout and local XAMPP, where `app/` is a sibling of `public/`.
+The workflow packages the app under the selected FTP target (which is `htdocs`), copying `app/`, `config/`, and `storage/` alongside the contents of `public/`. It explicitly excludes `public/uploads` from rsync, then rebuilds only the temporary package's `uploads/` directory with `.htaccess` protection files and `.gitkeep` placeholders. `public/.htaccess` becomes the document root's `.htaccess`. Its rules deny HTTP requests to `/app`, `/config`, and `/storage`, and block script-like extensions under `/uploads`; each private directory also has its own deny rule. PHP filesystem includes continue to work. The front controller supports both this layout and local XAMPP, where `app/` is a sibling of `public/`.
 
 The deployment package includes `config/config.example.php` but never `config/config.php`. Create the latter through the hosting File Manager with production database settings before live deployment. It is under `config/` and protected by both the directory `.htaccess` and root rewrite rule. Database schema, migrations, scripts, docs, `.git`, database exports, local logs, and local upload media are not packaged.
 
@@ -50,7 +50,7 @@ Create these **repository Actions secrets** in the same page:
 - `FTP_USERNAME`: the hosting account's FTP username.
 - `FTP_PASSWORD`: the FTP password from the hosting account/client-area details; never put it in workflow YAML.
 
-The workflow uses explicit FTPS with certificate validation through `lftp`. The FTP hostname shown in the account's FTP details is normally `ftpupload.net`; use the hostname matching the server certificate. SFTP/SSH is not used. It previews an upload-only sync before any live transfer. Unlike a mirror action that tracks removals, the upload command never deletes remote files. It excludes all `.htaccess` files (to preserve host-specific rules), `config/config.php`, storage logs/cache data, and local upload media. Other existing files with names in the package can be overwritten when their local versions change.
+The workflow uses explicit FTPS with certificate validation through `lftp`. The FTP hostname shown in the account's FTP details is normally `ftpupload.net`; use the hostname matching the server certificate. SFTP/SSH is not used. It previews an upload-only sync before any live transfer. Unlike a mirror action that tracks removals, the upload command never deletes remote files. It excludes all `.htaccess` files (to preserve host-specific rules), `config/config.php`, storage logs/cache data, and local upload media. Existing production uploads are not included or overwritten. Other existing files with names in the package can be overwritten when their local versions change.
 
 Before enabling uploads:
 
@@ -63,6 +63,10 @@ Before enabling uploads:
 7. After confirming the target and package, creating `config/config.php`, and installing the required access rules, set `FTP_DEPLOY_ENABLED` to `true`. On manual runs, also check `confirm_deploy`; pushes to `main` then upload automatically. Every run previews the upload before the gated transfer.
 
 The workflow does not install server-side dependencies, run migrations, import SQL, transfer database content, or upload administrator/contact data. Provision the production schema, account, and initial administrator separately as described above. No remote files are deleted; production uploads, database content, logs, cache, and `config/config.php` are not part of the upload package.
+
+### Migrating local uploaded media
+
+The repository ignores CMS-uploaded files under `public/uploads`; they are local runtime data, not source assets. The deployment package intentionally excludes them, so a new/empty hosting account will not receive images or documents referenced by migrated database rows. If migrating content, first review which `uploads/...` paths its rows use, then transfer only those required files separately to the matching `htdocs/uploads/{projects,certificates,designs,profile,resume}/` folders using the hosting File Manager or FTP. Back up the production files first, verify matching paths and contents, and do not replace existing production uploads unintentionally. This manual media transfer is separate from Actions deployment and never copies local uploads wholesale.
 
 ## Configure the production database
 
