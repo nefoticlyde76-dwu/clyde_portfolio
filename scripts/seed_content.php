@@ -49,6 +49,7 @@ function seed_content(PDO $pdo, int $inserted, int $skipped, int $aligned): arra
     if (seed_exists($pdo, 'SELECT id FROM profile_settings WHERE id = 1')) {
         $skipped++;
         $aligned += seed_align_profile($pdo);
+        $aligned += seed_align_profile_headline($pdo);
     } else {
         seed_execute($pdo, 'INSERT INTO profile_settings (
             id, full_name, headline, introduction, biography, location,
@@ -140,7 +141,7 @@ function seed_profile(): array
 {
     return [
         'full_name' => 'Clyde Nefoti',
-        'headline' => 'Final Year Bachelor of Information Systems Student | Web and Systems Developer | IT Support',
+        'headline' => 'CLYDE NEFOTI',
         'introduction' => 'Final year Bachelor of Information Systems student at Divine Word University who designed, built and deployed a live web based teleconsultation system for the Milne Bay Provincial Health Authority using PHP, MySQL and JavaScript. Skilled in systems analysis and design, database design and front end development, with additional experience in graphic design and in leading a student association communication team. Seeking a graduate role in web and systems development or IT support.',
         'biography' => seed_biography(),
         'location' => 'Madang, Papua New Guinea',
@@ -351,6 +352,25 @@ function seed_align_profile(PDO $pdo): int
     ]);
 
     return $updated + $previousProfile->rowCount();
+}
+
+function seed_align_profile_headline(PDO $pdo): int
+{
+    $profile = seed_profile();
+    $statement = $pdo->prepare('UPDATE profile_settings
+        SET headline = :headline
+        WHERE id = 1
+          AND headline = :original_headline
+          AND introduction = :introduction
+          AND biography = :biography');
+    $statement->execute([
+        'headline' => $profile['headline'],
+        'original_headline' => 'Final Year Bachelor of Information Systems Student | Web and Systems Developer | IT Support',
+        'introduction' => $profile['introduction'],
+        'biography' => seed_biography(),
+    ]);
+
+    return $statement->rowCount();
 }
 
 function seed_align_projects(PDO $pdo): int
