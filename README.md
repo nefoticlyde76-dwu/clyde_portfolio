@@ -30,7 +30,7 @@ Local portfolio and private content system for XAMPP. The public site reads publ
 
    phpMyAdmin alternative: create and select the `clyde_portfolio` database, choose **Import**, and import `database\schema.sql`.
 
-4. Load the CV-backed starting content. The script inserts missing records and does not replace text you later edit in the dashboard. It only aligns earlier seed text when the existing row still matches its original content:
+4. Load the CV-backed starting content or align earlier seed content with the supplied CV. The script inserts missing records and preserves content edited in the dashboard:
 
    ```text
    C:\xampp\php\php.exe scripts\seed_content.php
@@ -72,12 +72,12 @@ Set these in `config\config.php`:
 
 ## What the seed contains
 
-Published rows come from the supplied professional CV:
+Published starting content reflects the supplied professional CV:
 
-- Profile summary, headline, biography, and Madang location
-- The TeleHealth PNG capstone, including its live site and documented features
-- Web and database skills, tools and platforms, systems analysis, coursework exposure, design, and professional skills
-- Independent graphic design, student association leadership, and the Divine Word University degree
+- Profile summary, headline, and Madang location
+- The TeleHealth PNG capstone project, including its published live link
+- Skills grouped by web and databases, tools and platforms, systems analysis, coursework exposure, design, and professional skills
+- Independent design work, student association leadership, and the Divine Word University degree
 
 Left empty or unpublished:
 
@@ -85,10 +85,9 @@ Left empty or unpublished:
 - NCRA, until you supply accurate details
 - Public email, phone, LinkedIn, GitHub, resume, and profile image, because the CV still has placeholders
 - TeleHealth source code, because the CV records Git and GitHub for version control but no repository address. The live site is the CV link `https://mbphatelehealth.com`
-- The WPU Enterprise Information System and ICT Services helpdesk placement, because they are not listed in this CV; matching original seed records are retained as drafts
 - Lodestar Studio and the tableware logo contest, saved as drafts without images
 
-Run `scripts\seed_content.php` again to add any missing CV-backed rows or draft design samples. It will not overwrite a row you have edited, and it will not add certificates or NCRA. Contact details and social links remain empty because the CV contains placeholders for them.
+The earlier WPU project and helpdesk placement are archived as drafts because they are not listed in the supplied CV. Their records remain available in the dashboard. Run `scripts\seed_content.php` again to add missing starting rows or align known original seed text. It will not overwrite dashboard-edited content, and it will not add certificates or NCRA.
 
 ## Private folders
 
