@@ -1,0 +1,45 @@
+name: Deploy to InfinityFree
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  web-deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get latest code
+      uses: actions/checkout@v3
+
+    # Step 1: Upload backend folders (app, config, etc.) to the account root
+    - name: Sync backend files
+      uses: SamKirkland/FTP-Deploy-Action@4.3.4
+      with:
+        server: ftpupload.net
+        username: if0_43284790
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./
+        server-dir: /
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          public/**
+          docs/**
+          README.md
+          .gitignore
+          .github/**
+
+    # Step 2: Upload the public folder contents to htdocs
+    - name: Sync public files
+      uses: SamKirkland/FTP-Deploy-Action@4.3.4
+      with:
+        server: ftpupload.net
+        username: if0_43284790
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./public/
+        server-dir: /htdocs/
+        exclude: |
+          **/.git*
