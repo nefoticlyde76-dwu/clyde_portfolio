@@ -7,7 +7,7 @@ namespace App\Core;
 use PDO;
 use SessionUpdateTimestampHandlerInterface;
 
-final class DatabaseSessionHandler implements SessionUpdateTimestampHandlerInterface
+final class DatabaseSessionHandler implements \SessionHandlerInterface, \SessionUpdateTimestampHandlerInterface
 {
     public function open(string $path, string $name): bool
     {
