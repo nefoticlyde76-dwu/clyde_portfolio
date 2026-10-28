@@ -1,6 +1,7 @@
 /config/config.php
 /.env
 /.env.*
+/node_modules/
 !/.env.example
 /storage/logs/*.log
 /storage/cache/*
@@ -13,6 +14,7 @@
 /public/uploads/resume/*
 !/public/uploads/**/.gitkeep
 !/public/uploads/**/.htaccess
+public/assets/js/admin-blob-upload.bundle.js
 .DS_Store
 Thumbs.db
 desktop.ini

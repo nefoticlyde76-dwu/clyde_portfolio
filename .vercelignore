@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+config/config.php
+.env
+.env.*
+storage/logs/*
+storage/cache/*
+public/uploads/projects/*
+public/uploads/certificates/*
+public/uploads/designs/*
+public/uploads/profile/*
+public/uploads/resume/*

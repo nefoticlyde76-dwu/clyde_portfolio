@@ -1,0 +1,14 @@
+{
+  "name": "clyde-portfolio",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild public/assets/js/admin-blob-upload.js --bundle --platform=browser --target=es2022 --outfile=public/assets/js/admin-blob-upload.bundle.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "2.8.2",
+    "esbuild": "0.27.4"
+  }
+}

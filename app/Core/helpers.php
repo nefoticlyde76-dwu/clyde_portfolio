@@ -22,9 +22,36 @@ function app_config(): array
     return $config;
 }
 
+function blob_upload_token(string $folder): string
+{
+    $secret = (string) app_config()['blob_upload_secret'];
+    if (
+        !auth_check()
+        || $secret === ''
+        || !in_array($folder, ['projects', 'certificates', 'designs', 'profile', 'resume'], true)
+    ) {
+        return '';
+    }
+
+    $payload = json_encode(
+        ['folder' => $folder, 'expires' => time() + 600],
+        JSON_THROW_ON_ERROR
+    );
+    $encodedPayload = rtrim(strtr(base64_encode($payload), '+/', '-_'), '=');
+    $signature = hash_hmac('sha256', $encodedPayload, $secret, true);
+    $encodedSignature = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
+
+    return $encodedPayload . '.' . $encodedSignature;
+}
+
 function app_log(string $message): void
 {
     $line = date('c') . ' ' . $message . PHP_EOL;
+    if (getenv('VERCEL') === '1') {
+        error_log(rtrim($line));
+        return;
+    }
+
     @file_put_contents(STORAGE_PATH . '/logs/app.log', $line, FILE_APPEND);
 }
 
@@ -218,8 +245,11 @@ function safe_phone(?string $value): string
 function media_url(?string $path): ?string
 {
     $path = str_replace('\\', '/', trim((string) $path));
-    if ($path === '' || str_contains($path, '..') || str_contains($path, '://')) {
+    if ($path === '' || str_contains($path, '..')) {
         return null;
+    }
+    if (str_contains($path, '://')) {
+        return blob_media_url($path);
     }
 
     $path = ltrim($path, '/');
@@ -409,6 +439,13 @@ function admin_nav_current(string $path): bool
 
 function client_ip(): string
 {
+    if (getenv('VERCEL') === '1') {
+        $forwardedIp = trim((string) ($_SERVER['HTTP_X_REAL_IP'] ?? ''));
+        if (filter_var($forwardedIp, FILTER_VALIDATE_IP) !== false) {
+            return $forwardedIp;
+        }
+    }
+
     $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 
     return $ip !== '' ? $ip : 'unknown';
@@ -421,6 +458,20 @@ function login_throttle_blocked(string $ip, int $max = 5, int $windowSeconds = 9
 
 function login_throttle_hit(string $ip, int $windowSeconds = 900): void
 {
+    if (app_config()['session_driver'] === 'database') {
+        $connection = \App\Core\Database::connection();
+        $statement = $connection->prepare(
+            'INSERT INTO login_attempts (ip_hash, attempted_at) VALUES (:ip_hash, :attempted_at)'
+        );
+        $statement->execute([
+            'ip_hash' => hash('sha256', $ip),
+            'attempted_at' => time(),
+        ]);
+        $cleanup = $connection->prepare('DELETE FROM login_attempts WHERE attempted_at < :cutoff');
+        $cleanup->execute(['cutoff' => time() - 86400]);
+        return;
+    }
+
     $hits = login_throttle_hits($ip, $windowSeconds);
     $hits[] = time();
     login_throttle_write($ip, $hits);
@@ -428,6 +479,14 @@ function login_throttle_hit(string $ip, int $windowSeconds = 900): void
 
 function login_throttle_clear(string $ip): void
 {
+    if (app_config()['session_driver'] === 'database') {
+        $statement = \App\Core\Database::connection()->prepare(
+            'DELETE FROM login_attempts WHERE ip_hash = :ip_hash'
+        );
+        $statement->execute(['ip_hash' => hash('sha256', $ip)]);
+        return;
+    }
+
     $path = login_throttle_file($ip);
     if (is_file($path)) {
         unlink($path);
@@ -436,6 +495,20 @@ function login_throttle_clear(string $ip): void
 
 function login_throttle_hits(string $ip, int $windowSeconds): array
 {
+    if (app_config()['session_driver'] === 'database') {
+        $statement = \App\Core\Database::connection()->prepare(
+            'SELECT attempted_at FROM login_attempts
+             WHERE ip_hash = :ip_hash AND attempted_at >= :cutoff
+             ORDER BY attempted_at ASC'
+        );
+        $statement->execute([
+            'ip_hash' => hash('sha256', $ip),
+            'cutoff' => time() - $windowSeconds,
+        ]);
+
+        return array_map('intval', $statement->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
     $path = login_throttle_file($ip);
     if (!is_file($path)) {
         return [];
@@ -659,8 +732,11 @@ function release_upload(?string $relative): void
 function upload_relative(?string $path): ?string
 {
     $path = str_replace('\\', '/', trim((string) $path));
-    if ($path === '' || str_contains($path, '..') || str_contains($path, '://')) {
+    if ($path === '' || str_contains($path, '..')) {
         return null;
+    }
+    if (str_contains($path, '://')) {
+        return blob_media_url($path);
     }
 
     $path = ltrim($path, '/');
@@ -669,6 +745,46 @@ function upload_relative(?string $path): ?string
     }
 
     return $path;
+}
+
+function blob_media_url(string $path): ?string
+{
+    $base = (string) app_config()['blob_base_url'];
+    $baseParts = parse_url($base);
+    $urlParts = parse_url($path);
+    if (
+        $base === ''
+        || !is_array($baseParts)
+        || !is_array($urlParts)
+        || ($baseParts['scheme'] ?? '') !== 'https'
+        || ($urlParts['scheme'] ?? '') !== 'https'
+        || strtolower((string) ($baseParts['host'] ?? '')) !== strtolower((string) ($urlParts['host'] ?? ''))
+        || ($baseParts['port'] ?? null) !== ($urlParts['port'] ?? null)
+        || array_intersect(['user', 'pass', 'query', 'fragment'], array_keys($urlParts)) !== []
+    ) {
+        return null;
+    }
+
+    $urlPath = rawurldecode((string) ($urlParts['path'] ?? ''));
+    if (str_contains($urlPath, '..')) {
+        return null;
+    }
+    if (!preg_match('#^/uploads/(projects|certificates|designs|profile|resume)/([A-Za-z0-9][A-Za-z0-9._-]{0,180})$#', $urlPath, $matches)) {
+        return null;
+    }
+
+    $allowed = [
+        'projects' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        'designs' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        'profile' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        'certificates' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'],
+        'resume' => ['pdf', 'doc', 'docx'],
+    ];
+    $extension = strtolower(pathinfo($matches[2], PATHINFO_EXTENSION));
+
+    return in_array($extension, $allowed[$matches[1]], true) && ($baseParts['path'] ?? '') === ''
+        ? $path
+        : null;
 }
 
 function upload_absolute(?string $relative): ?string

@@ -26,6 +26,16 @@ $describedBy = $described === [] ? '' : ' aria-describedby="' . e(implode(' ', $
 $invalid = $error !== '' ? ' aria-invalid="true"' : '';
 $requiredAttr = $required ? ' required' : '';
 $maxAttr = $max > 0 ? ' maxlength="' . $max . '"' : '';
+$blobFolders = [
+    'cover_image' => 'projects',
+    'certificate_file' => 'certificates',
+    'display_image' => 'certificates',
+    'design_image' => 'designs',
+    'profile_image' => 'profile',
+    'resume_file' => 'resume',
+];
+$blobFolder = $blobFolders[$name] ?? '';
+$blobToken = $type === 'file' && $blobFolder !== '' ? blob_upload_token($blobFolder) : '';
 ?>
 <div class="field<?= $error !== '' ? ' has-error' : '' ?>">
     <?php if ($type === 'checkbox'): ?>
@@ -52,7 +62,7 @@ $maxAttr = $max > 0 ? ' maxlength="' . $max . '"' : '';
                     <a href="<?= e($preview) ?>" rel="noopener noreferrer"><?= e($previewLabel) ?></a>
                 </p>
             <?php endif; ?>
-            <input id="<?= e($id) ?>" type="file" name="<?= e($name) ?>"<?= $accept !== '' ? ' accept="' . e($accept) . '"' : '' ?><?= $describedBy ?><?= $invalid ?>>
+            <input id="<?= e($id) ?>" type="file" name="<?= e($name) ?>"<?= $accept !== '' ? ' accept="' . e($accept) . '"' : '' ?><?= $blobToken !== '' ? ' data-blob-folder="' . e($blobFolder) . '" data-blob-token="' . e($blobToken) . '" data-blob-endpoint="' . e(url('api/blob-upload')) . '"' : '' ?><?= $describedBy ?><?= $invalid ?>>
         <?php else: ?>
             <input id="<?= e($id) ?>" type="<?= e($type) ?>" name="<?= e($name) ?>" value="<?= e($value) ?>"<?= $requiredAttr ?><?= $maxAttr ?><?= $describedBy ?><?= $invalid ?>>
         <?php endif; ?>

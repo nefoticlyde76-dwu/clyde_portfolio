@@ -16,7 +16,9 @@ if (!defined('PUBLIC_PATH')) {
 
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
-ini_set('error_log', STORAGE_PATH . '/logs/php.log');
+if (getenv('VERCEL') !== '1') {
+    ini_set('error_log', STORAGE_PATH . '/logs/php.log');
+}
 
 require APP_PATH . '/Core/helpers.php';
 
@@ -63,6 +65,9 @@ session_set_cookie_params([
 ]);
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    if ($config['session_driver'] === 'database') {
+        session_set_save_handler(new App\Core\DatabaseSessionHandler(), true);
+    }
     session_start();
 }
 

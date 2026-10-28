@@ -24,6 +24,15 @@ final class Upload
      */
     public static function take(string $field, string $folder, array $extensions): array
     {
+        $blobUrl = $_POST[$field . '_blob_url'] ?? null;
+        if (is_string($blobUrl) && $blobUrl !== '') {
+            if (self::validBlobUrl($blobUrl, $folder, $extensions)) {
+                return ['path' => $blobUrl, 'error' => null];
+            }
+
+            return ['path' => null, 'error' => 'The uploaded file reference is not valid.'];
+        }
+
         if (!isset($_FILES[$field]) || !is_array($_FILES[$field])) {
             return ['path' => null, 'error' => null];
         }
@@ -84,6 +93,42 @@ final class Upload
         }
 
         return ['path' => 'uploads/' . $folder . '/' . $filename, 'error' => null];
+    }
+
+    /**
+     * Accept only public Blob URLs from the configured store and expected folder.
+     *
+     * @param array<int, string> $extensions
+     */
+    private static function validBlobUrl(string $url, string $folder, array $extensions): bool
+    {
+        $base = (string) app_config()['blob_base_url'];
+        $baseParts = parse_url($base);
+        $urlParts = parse_url($url);
+        if (
+            $base === ''
+            || !is_array($baseParts)
+            || !is_array($urlParts)
+            || ($baseParts['scheme'] ?? '') !== 'https'
+            || ($urlParts['scheme'] ?? '') !== 'https'
+            || strtolower((string) ($baseParts['host'] ?? '')) !== strtolower((string) ($urlParts['host'] ?? ''))
+            || ($baseParts['port'] ?? null) !== ($urlParts['port'] ?? null)
+            || array_intersect(['user', 'pass', 'query', 'fragment'], array_keys($urlParts)) !== []
+            || ($baseParts['path'] ?? '') !== ''
+        ) {
+            return false;
+        }
+
+        $path = rawurldecode((string) ($urlParts['path'] ?? ''));
+        if (str_contains($path, '..')) {
+            return false;
+        }
+        if (!preg_match('#^/uploads/' . preg_quote($folder, '#') . '/([A-Za-z0-9][A-Za-z0-9._-]{0,180})$#', $path, $matches)) {
+            return false;
+        }
+
+        $extension = strtolower(pathinfo($matches[1], PATHINFO_EXTENSION));
+        return in_array($extension, $extensions, true) && isset(self::MIME[$extension]);
     }
 
     /**
