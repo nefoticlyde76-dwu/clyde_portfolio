@@ -1,0 +1,35 @@
+.admin-auth-status {
+    margin: 0;
+    color: var(--color-muted);
+}
+
+.admin-auth-status.is-error {
+    color: #FDA4AF;
+}
+
+.admin-auth-form :focus-visible,
+.admin-auth-actions :focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 3px;
+}
+
+.admin-auth-form button[disabled],
+.admin-auth-actions button[disabled] {
+    cursor: wait;
+    opacity: 0.72;
+}
+
+.admin-auth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.admin-auth-actions .btn {
+    width: 100%;
+}
+
+.admin-auth-name {
+    color: var(--color-heading);
+}

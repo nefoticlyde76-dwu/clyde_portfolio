@@ -1,0 +1,194 @@
+name: Verify Linux authentication runtime
+
+on:
+  push:
+    branches:
+      - migration/netlify
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-linux-auth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-auth:
+    name: Linux x64 Argon2 and Netlify Functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies, including optional native packages
+        run: npm ci --include=optional
+
+      - name: Verify Linux x64 GNU Argon2 through the authentication module
+        run: |
+          uname -a
+          node --version
+          node --input-type=module --experimental-strip-types <<'NODE'
+          import assert from "node:assert/strict";
+          import { randomBytes } from "node:crypto";
+          import { createRequire } from "node:module";
+          import { existsSync, readFileSync } from "node:fs";
+          import { resolve } from "node:path";
+          import { hashPassword, verifyPassword } from "./netlify/lib/auth/password.mts";
+
+          assert.equal(process.platform, "linux", "Expected a Linux runner");
+          assert.equal(process.arch, "x64", "Expected an x64 runner");
+
+          const require = createRequire(import.meta.url);
+          const nativeBinary = require.resolve("@node-rs/argon2-linux-x64-gnu");
+          const nativePackage = JSON.parse(
+            readFileSync("node_modules/@node-rs/argon2-linux-x64-gnu/package.json", "utf8"),
+          );
+          const argonPackage = JSON.parse(
+            readFileSync("node_modules/@node-rs/argon2/package.json", "utf8"),
+          );
+          const windowsBinary = resolve(
+            "node_modules/@node-rs/argon2-win32-x64-msvc/argon2.win32-x64-msvc.node",
+          );
+
+          assert.match(nativeBinary, /argon2\.linux-x64-gnu\.node$/);
+          assert.equal(existsSync(windowsBinary), false, "Windows native binary must not be used");
+          assert.equal(nativePackage.version, argonPackage.version);
+          assert.equal(argonPackage.version, "2.2.2");
+
+          const disposablePassword = randomBytes(32).toString("base64url");
+          const encoded = await hashPassword(disposablePassword);
+          assert.equal(await verifyPassword(encoded, disposablePassword), true);
+          assert.equal(await verifyPassword(encoded, `${disposablePassword}-wrong`), false);
+
+          console.log(`Architecture: ${process.arch}`);
+          console.log(`@node-rs/argon2: ${argonPackage.version}`);
+          console.log(`Linux GNU native package: ${nativePackage.version}`);
+          console.log(`Resolved native binary: ${nativeBinary}`);
+          console.log("Password hash, correct-password verification, and wrong-password rejection passed.");
+          NODE
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run isolated authentication tests
+        run: npm run test:auth
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Read Netlify Functions build help
+        run: ./node_modules/.bin/netlify functions:build --help
+
+      - name: Build Netlify Functions
+        run: ./node_modules/.bin/netlify functions:build --src netlify/functions --functions .netlify/functions-build
+
+      - name: Inspect function archives and extract the login artifact
+        id: inspect-functions
+        run: |
+          python3 - <<'PY'
+          import os
+          import tempfile
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          build_dir = Path(".netlify/functions-build")
+          expected = {
+              "admin-auth-login",
+              "admin-auth-logout",
+              "admin-auth-me",
+              "admin-setup",
+              "health",
+          }
+          archives = {path.stem: path for path in build_dir.glob("*.zip")}
+          if set(archives) != expected:
+              raise SystemExit(f"Unexpected function archives: {sorted(archives)}")
+
+          secret_suffixes = {".pem", ".key", ".p12", ".pfx", ".p8"}
+          for name, archive_path in sorted(archives.items()):
+              with zipfile.ZipFile(archive_path) as archive:
+                  entries = archive.namelist()
+                  lowered = [entry.lower() for entry in entries]
+                  if any("argon2-win32" in entry or "argon2.win32" in entry for entry in lowered):
+                      raise SystemExit(f"{name} contains a Windows Argon2 native binary")
+                  for entry in entries:
+                      basename = PurePosixPath(entry).name.lower()
+                      if basename == ".env" or basename.startswith(".env.") or basename == ".npmrc":
+                          raise SystemExit(f"{name} contains a secret-like file: {entry}")
+                      if basename.endswith(tuple(secret_suffixes)) or basename in {"id_rsa", "id_ed25519"}:
+                          raise SystemExit(f"{name} contains a secret-like file: {entry}")
+                  if f"netlify/functions/{name}.mjs" not in entries:
+                      raise SystemExit(f"{name} is missing its function entry point")
+
+                  native_entries = [
+                      entry
+                      for entry in entries
+                      if "argon2-linux-x64-gnu" in entry.lower()
+                      and entry.lower().endswith(".node")
+                  ]
+                  if name in {"admin-auth-login", "admin-setup"}:
+                      if not native_entries:
+                          raise SystemExit(f"{name} is missing the Linux GNU Argon2 binary")
+                  elif native_entries:
+                      raise SystemExit(f"{name} unexpectedly bundles Argon2")
+
+                  print(f"{name}: {archive_path.stat().st_size} bytes; Linux Argon2 binaries={len(native_entries)}")
+
+          login_archive = archives["admin-auth-login"]
+          extract_root = Path(tempfile.mkdtemp(prefix="netlify-login-artifact-", dir=os.environ["RUNNER_TEMP"]))
+          with zipfile.ZipFile(login_archive) as archive:
+              root_resolved = extract_root.resolve()
+              for entry in archive.infolist():
+                  destination = (extract_root / entry.filename).resolve()
+                  if os.path.commonpath((str(root_resolved), str(destination))) != str(root_resolved):
+                      raise SystemExit(f"Unsafe archive path: {entry.filename}")
+              archive.extractall(extract_root)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"artifact_root={extract_root}\n")
+          PY
+
+      - name: Import Argon2 from the packaged login function
+        env:
+          FUNCTION_ARTIFACT_ROOT: ${{ steps.inspect-functions.outputs.artifact_root }}
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const assert = require("node:assert/strict");
+          const { createRequire } = require("node:module");
+          const { join } = require("node:path");
+
+          const artifactRequire = createRequire(
+            join(process.env.FUNCTION_ARTIFACT_ROOT, "node_modules/@node-rs/argon2/package.json"),
+          );
+          const argon2 = artifactRequire("@node-rs/argon2");
+          const nativeBinary = artifactRequire.resolve("@node-rs/argon2-linux-x64-gnu");
+          const packageVersion = artifactRequire("@node-rs/argon2/package.json").version;
+          const nativeVersion = artifactRequire(
+            "@node-rs/argon2-linux-x64-gnu/package.json",
+          ).version;
+          const password = require("node:crypto").randomBytes(32).toString("base64url");
+
+          (async () => {
+            assert.match(nativeBinary, /argon2\.linux-x64-gnu\.node$/);
+            assert.equal(packageVersion, "2.2.2");
+            assert.equal(nativeVersion, packageVersion);
+            assert.equal(typeof argon2.hash, "function");
+            assert.equal(typeof argon2.verify, "function");
+            const encoded = await argon2.hash(password);
+            assert.equal(await argon2.verify(encoded, password), true);
+            assert.equal(await argon2.verify(encoded, `${password}-wrong`), false);
+            console.log(`Packaged Argon2 resolved and executed: ${nativeBinary}`);
+            console.log("Packaged password hash and verification checks passed.");
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE

@@ -3,6 +3,8 @@
 /.env.*
 /node_modules/
 !/.env.example
+/.netlify/
+/dist/
 /storage/logs/*.log
 /storage/cache/*
 !/storage/cache/.gitkeep
