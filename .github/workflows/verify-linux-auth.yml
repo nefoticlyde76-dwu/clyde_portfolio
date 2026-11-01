@@ -125,7 +125,8 @@ jobs:
                           raise SystemExit(f"{name} contains a secret-like file: {entry}")
                       if basename.endswith(tuple(secret_suffixes)) or basename in {"id_rsa", "id_ed25519"}:
                           raise SystemExit(f"{name} contains a secret-like file: {entry}")
-                  if f"netlify/functions/{name}.mjs" not in entries:
+                  entrypoints = {f"netlify/functions/{name}.mjs", f"{name}.mjs"}
+                  if not entrypoints.intersection(entries):
                       raise SystemExit(f"{name} is missing its function entry point")
 
                   native_entries = [
