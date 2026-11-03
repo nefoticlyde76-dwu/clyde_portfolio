@@ -82,7 +82,10 @@ jobs:
       - name: Run isolated authentication tests
         run: npm run test:auth
 
-      - name: Build static site
+      - name: Run isolated content and API tests
+        run: npm run test:content
+
+      - name: Build the production site
         run: npm run build
 
       - name: Read Netlify Functions build help
@@ -91,7 +94,7 @@ jobs:
       - name: Build Netlify Functions
         run: ./node_modules/.bin/netlify functions:build --src netlify/functions --functions .netlify/functions-build
 
-      - name: Inspect function archives and extract the login artifact
+      - name: Inspect and extract all function artifacts
         id: inspect-functions
         run: |
           python3 - <<'PY'
@@ -107,6 +110,13 @@ jobs:
               "admin-auth-me",
               "admin-setup",
               "health",
+              "admin-content",
+              "admin-media",
+              "public-contact",
+              "public-content",
+              "public-media",
+              "public-robots",
+              "public-sitemap",
           }
           archives = {path.stem: path for path in build_dir.glob("*.zip")}
           if set(archives) != expected:
@@ -141,55 +151,85 @@ jobs:
                   elif native_entries:
                       raise SystemExit(f"{name} unexpectedly bundles Argon2")
 
+                  if name in {"admin-media", "public-media"} and not any(
+                      "@netlify/blobs/" in entry.lower() for entry in entries
+                  ):
+                      raise SystemExit(f"{name} is missing the Netlify Blobs client")
+
                   print(f"{name}: {archive_path.stat().st_size} bytes; Linux Argon2 binaries={len(native_entries)}")
 
-          login_archive = archives["admin-auth-login"]
-          extract_root = Path(tempfile.mkdtemp(prefix="netlify-login-artifact-", dir=os.environ["RUNNER_TEMP"]))
-          with zipfile.ZipFile(login_archive) as archive:
-              root_resolved = extract_root.resolve()
-              for entry in archive.infolist():
-                  destination = (extract_root / entry.filename).resolve()
-                  if os.path.commonpath((str(root_resolved), str(destination))) != str(root_resolved):
-                      raise SystemExit(f"Unsafe archive path: {entry.filename}")
-              archive.extractall(extract_root)
+          extract_root = Path(tempfile.mkdtemp(prefix="netlify-function-artifacts-", dir=os.environ["RUNNER_TEMP"]))
+          for name, archive_path in sorted(archives.items()):
+              function_root = extract_root / name
+              function_root.mkdir()
+              with zipfile.ZipFile(archive_path) as archive:
+                  root_resolved = function_root.resolve()
+                  for entry in archive.infolist():
+                      destination = (function_root / entry.filename).resolve()
+                      if os.path.commonpath((str(root_resolved), str(destination))) != str(root_resolved):
+                          raise SystemExit(f"Unsafe archive path in {name}: {entry.filename}")
+                  archive.extractall(function_root)
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"artifact_root={extract_root}\n")
           PY
 
-      - name: Import Argon2 from the packaged login function
+      - name: Import every packaged function and execute packaged Argon2
         env:
           FUNCTION_ARTIFACT_ROOT: ${{ steps.inspect-functions.outputs.artifact_root }}
         run: |
-          node --input-type=commonjs <<'NODE'
-          const assert = require("node:assert/strict");
-          const { createRequire } = require("node:module");
-          const { join } = require("node:path");
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { randomBytes } from "node:crypto";
+          import { existsSync } from "node:fs";
+          import { createRequire } from "node:module";
+          import { join } from "node:path";
+          import { pathToFileURL } from "node:url";
 
-          const artifactRequire = createRequire(
-            join(process.env.FUNCTION_ARTIFACT_ROOT, "node_modules/@node-rs/argon2/package.json"),
-          );
+          const root = process.env.FUNCTION_ARTIFACT_ROOT;
+          const names = [
+            "admin-auth-login",
+            "admin-auth-logout",
+            "admin-auth-me",
+            "admin-setup",
+            "health",
+            "admin-content",
+            "admin-media",
+            "public-contact",
+            "public-content",
+            "public-media",
+            "public-robots",
+            "public-sitemap",
+          ];
+
+          for (const name of names) {
+            const functionRoot = join(root, name);
+            const candidates = [
+              join(functionRoot, "netlify/functions", `${name}.mjs`),
+              join(functionRoot, `${name}.mjs`),
+            ];
+            const entrypoint = candidates.find(existsSync);
+            assert.ok(entrypoint, `Missing packaged entry point for ${name}`);
+            await import(pathToFileURL(entrypoint).href);
+            console.log(`${name}: packaged entry point imported`);
+          }
+
+          const loginRoot = join(root, "admin-auth-login");
+          const artifactRequire = createRequire(join(loginRoot, "node_modules/@node-rs/argon2/package.json"));
           const argon2 = artifactRequire("@node-rs/argon2");
           const nativeBinary = artifactRequire.resolve("@node-rs/argon2-linux-x64-gnu");
           const packageVersion = artifactRequire("@node-rs/argon2/package.json").version;
-          const nativeVersion = artifactRequire(
-            "@node-rs/argon2-linux-x64-gnu/package.json",
-          ).version;
-          const password = require("node:crypto").randomBytes(32).toString("base64url");
+          const nativeVersion = artifactRequire("@node-rs/argon2-linux-x64-gnu/package.json").version;
+          const password = randomBytes(32).toString("base64url");
 
-          (async () => {
-            assert.match(nativeBinary, /argon2\.linux-x64-gnu\.node$/);
-            assert.equal(packageVersion, "2.2.2");
-            assert.equal(nativeVersion, packageVersion);
-            assert.equal(typeof argon2.hash, "function");
-            assert.equal(typeof argon2.verify, "function");
-            const encoded = await argon2.hash(password);
-            assert.equal(await argon2.verify(encoded, password), true);
-            assert.equal(await argon2.verify(encoded, `${password}-wrong`), false);
-            console.log(`Packaged Argon2 resolved and executed: ${nativeBinary}`);
-            console.log("Packaged password hash and verification checks passed.");
-          })().catch((error) => {
-            console.error(error);
-            process.exitCode = 1;
-          });
+          assert.match(nativeBinary, /argon2\.linux-x64-gnu\.node$/);
+          assert.equal(packageVersion, "2.2.2");
+          assert.equal(nativeVersion, packageVersion);
+          assert.equal(typeof argon2.hash, "function");
+          assert.equal(typeof argon2.verify, "function");
+          const encoded = await argon2.hash(password);
+          assert.equal(await argon2.verify(encoded, password), true);
+          assert.equal(await argon2.verify(encoded, `${password}-wrong`), false);
+          console.log(`Packaged Argon2 resolved and executed: ${nativeBinary}`);
+          console.log("Packaged password hash and verification checks passed.");
           NODE

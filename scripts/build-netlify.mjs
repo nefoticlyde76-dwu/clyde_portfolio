@@ -11,12 +11,17 @@ if (relativeOutput === "" || relativeOutput.startsWith(`..${path.sep}`) || path.
 }
 
 const assets = [
+    ["public/index.html", "index.html"],
     ["public/assets/css/app.css", "assets/css/app.css"],
+    ["public/assets/css/portfolio.css", "assets/css/portfolio.css"],
     ["public/assets/css/admin.css", "assets/css/admin.css"],
     ["public/assets/css/admin-auth.css", "assets/css/admin-auth.css"],
+    ["public/assets/css/admin-dashboard.css", "assets/css/admin-dashboard.css"],
     ["public/assets/js/app.js", "assets/js/app.js"],
+    ["public/assets/js/portfolio.js", "assets/js/portfolio.js"],
     ["public/assets/js/admin.js", "assets/js/admin.js"],
     ["public/assets/js/admin-auth.js", "assets/js/admin-auth.js"],
+    ["public/assets/js/admin-dashboard.js", "assets/js/admin-dashboard.js"],
     ["public/admin/login.html", "admin/login.html"],
     ["public/admin/index.html", "admin/index.html"],
 ];

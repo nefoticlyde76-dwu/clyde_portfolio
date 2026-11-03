@@ -38,3 +38,62 @@
   to = "/.netlify/functions/admin-auth-logout"
   status = 200
   force = true
+
+[[redirects]]
+from = "/api/admin/content"
+to = "/.netlify/functions/admin-content"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/admin/media"
+to = "/.netlify/functions/admin-media"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/public/content"
+to = "/.netlify/functions/public-content"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/public/contact"
+to = "/.netlify/functions/public-contact"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/public/media"
+to = "/.netlify/functions/public-media"
+status = 200
+force = true
+
+[[redirects]]
+from = "/admin"
+to = "/admin/index.html"
+status = 200
+force = true
+
+[[redirects]]
+from = "/admin/login"
+to = "/admin/login.html"
+status = 200
+force = true
+
+[[redirects]]
+from = "/sitemap.xml"
+to = "/.netlify/functions/public-sitemap"
+status = 200
+force = true
+
+[[redirects]]
+from = "/robots.txt"
+to = "/.netlify/functions/public-robots"
+status = 200
+force = true
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

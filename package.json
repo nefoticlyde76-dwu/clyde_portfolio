@@ -10,9 +10,11 @@
     "build:netlify": "npm run typecheck && node scripts/build-netlify.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "netlify dev",
-    "test:auth": "node --experimental-strip-types --test tests/auth.test.mts"
+    "test:auth": "node --experimental-strip-types --test tests/auth.test.mts",
+    "test:content": "node --experimental-strip-types --test tests/content.test.mts"
   },
   "dependencies": {
+    "@netlify/blobs": "10.7.13",
     "@netlify/database": "^2.0.1",
     "@netlify/functions": "^6.0.3",
     "@node-rs/argon2": "^2.2.2",

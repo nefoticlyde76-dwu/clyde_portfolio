@@ -1,0 +1,65 @@
+#design-viewer {
+    width: min(92vw, 58rem);
+    max-height: 90vh;
+    padding: clamp(1rem, 3vw, 1.6rem);
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+#design-viewer::backdrop {
+    background: rgba(0, 0, 0, 0.82);
+}
+
+.design-viewer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.design-viewer-head h2 {
+    margin-bottom: 0.5rem;
+}
+
+.design-viewer-close {
+    min-height: 2.5rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-panel);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+#design-viewer-image {
+    display: block;
+    max-width: 100%;
+    max-height: 70vh;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
+#design-viewer-description {
+    margin: 1rem 0 0;
+    white-space: pre-wrap;
+}
+
+.form-alert.is-success {
+    border-color: var(--color-green);
+    color: var(--color-heading);
+}
+
+.contact-form button:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.contact-form .hp-field {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}

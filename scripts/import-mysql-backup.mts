@@ -86,6 +86,7 @@ const REQUIRED_MIGRATIONS = [
   "0001_portfolio_schema",
   "0002_auth_support",
   "0003_auth_atomicity",
+  "0004_contact_rate_limits",
 ];
 const REPORT_FILENAME = ".tmp-phase2c-import-report.json";
 
