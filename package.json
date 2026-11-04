@@ -24,7 +24,7 @@
   "devDependencies": {
     "@netlify/database-dev": "^0.10.1",
     "@types/node": "^22.20.5",
-    "netlify-cli": "^26.2.0",
+    "netlify-cli": "^27.16.2",
     "typescript": "^6.0.2"
   }
 }

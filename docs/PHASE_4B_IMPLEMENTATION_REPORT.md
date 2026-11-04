@@ -3,9 +3,10 @@
 ## Status
 
 Phase 4B implementation is present in the `migration/netlify` worktree. Local
-type, test, build, function-package, and browser-smoke checks are recorded below.
-This is not a production or managed-service acceptance report. No production
-database, Netlify Blob store, deploy, or permanent administrator was used.
+type, test, build, and function-package checks and the hosted Linux result for
+commit `928ac6c` are recorded below. This is not a production or managed-service
+acceptance report. No production database, Netlify Blob store, deploy, or
+permanent administrator was used.
 
 The Phase 4A feature-parity matrix remains an audit-time snapshot. See
 `PHASE_4_ADMIN_DASHBOARD_IMPLEMENTATION_REPORT.md` for the module audit and
@@ -56,7 +57,8 @@ deployment requirements.
 | Content/API regression | PASS | `npm run test:content` — isolated ephemeral database; one integration test covers authenticated CRUD, public visibility, contact validation/throttling, media guards, and transaction rollback |
 | Production build | PASS | `npm run build`; static output contains the public/admin entry points and approved assets |
 | JavaScript syntax | PASS | `node --check` on the dashboard, public-site, and build scripts |
-| Function packaging | PASS locally | `npx netlify functions:build --src netlify/functions --functions .netlify/functions`; manifest contains 12 functions |
+| Function packaging | PASS locally with CLI 27.16.2 | All 12 archives built; all 12 entry points imported under Node.js 22 |
+| Netlify configuration | PASS locally with CLI 27.16.2 | `netlify build --dry --offline` loaded `netlify.toml` |
 | Browser smoke | NOT VERIFIED | Prior mock-backed smoke covered public home, project list/detail, contact submission, dashboard overview/project creation, mobile navigation, and a narrow viewport; not every module or failure state |
 | Whitespace | PASS | `git diff --check` |
 
@@ -65,9 +67,17 @@ responses, not imported portfolio content or Netlify services. Local function
 packaging does not prove a deployed Netlify runtime or managed PostgreSQL/Blob
 behavior.
 
-The GitHub Actions workflow `verify-linux-auth.yml` has been extended to run
-both test suites, the production build, and packaging/import checks for all 12
-functions on Ubuntu. Hosted execution remains pending.
+## Hosted Linux verification
+
+The GitHub-hosted run for commit
+`928ac6c73a11717f74c43c0ec544b21f6d8f9971` passed on Ubuntu 24.04 x64 with
+Node.js 22.23.4 and npm 10.9.9. It passed `npm ci --include=optional`,
+Linux Argon2 verification, TypeScript validation, authentication tests
+(18/18), content tests, the production build, packaging/import checks for all
+12 Functions, and packaged Linux Argon2 execution. That run predates the local
+Netlify CLI 27.16.2 upgrade and the additional `admin-content` Blobs assertion;
+the updated dependency tree and workflow still require a hosted run. It does
+not verify real Netlify Blobs or managed PostgreSQL behavior.
 
 ## Explicitly unverified
 
@@ -76,7 +86,8 @@ functions on Ubuntu. Hosted execution remains pending.
 - Deployment routing, redirects, headers, browser behavior on the target
   Netlify site, and interaction with the production domain.
 - Full browser coverage for every module and every validation/error state.
-- Actual execution of the expanded Linux workflow on a GitHub-hosted runner.
+- Hosted Linux execution of the local CLI 27.16.2 upgrade and the expanded
+  `admin-content` Blobs assertion.
 - The image/PDF upload limit is 4 MiB. The PHP application permits larger
   uploads for some types; parity above 4 MiB is intentionally not claimed.
 - Association and publication of the five inventoried orphan media files.

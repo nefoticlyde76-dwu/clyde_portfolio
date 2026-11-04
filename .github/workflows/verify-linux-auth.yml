@@ -151,7 +151,7 @@ jobs:
                   elif native_entries:
                       raise SystemExit(f"{name} unexpectedly bundles Argon2")
 
-                  if name in {"admin-media", "public-media"} and not any(
+                  if name in {"admin-content", "admin-media", "public-media"} and not any(
                       "@netlify/blobs/" in entry.lower() for entry in entries
                   ):
                       raise SystemExit(f"{name} is missing the Netlify Blobs client")

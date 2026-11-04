@@ -8,9 +8,10 @@ against the PHP application. Local tests use the disposable
 imported database, a managed PostgreSQL instance, or a Netlify site.
 
 **Local feature status: PASS WITH LIMITATIONS. Deployment readiness: NOT
-VERIFIED.** The current repository work remains on `migration/netlify`. No
-production data or credentials were accessed, no permanent administrator was
-created, and no deployment or publication occurred.
+VERIFIED.** The current repository work remains on `migration/netlify`. The
+baseline verification commit `928ac6c` was published to GitHub; no production
+data or credentials were accessed, no permanent administrator was created,
+and no production deployment occurred.
 
 ## Feature-by-feature implementation
 
@@ -61,14 +62,20 @@ also present.
 | `npm run build` | PASS | Typecheck, Vercel browser bundle, and approved static Netlify output |
 | `node --check public\\assets\\js\\portfolio.js` | PASS | Public client script |
 | `node --check public\\assets\\js\\admin-dashboard.js` | PASS | Dashboard client script |
-| `npx netlify functions:build --src netlify/functions --functions .netlify/functions` | PASS locally | 12 function archives and manifest |
+| `netlify functions:build --src netlify/functions --functions .netlify/functions` | PASS locally with CLI 27.16.2 | All 12 archives built; all 12 entry points imported under Node.js 22 |
+| `netlify build --dry --offline` | PASS locally with CLI 27.16.2 | `netlify.toml` loaded |
 | `git diff --check` | PASS | Worktree patch |
 | Browser checks | NOT VERIFIED | Prior mock-backed smoke covered representative public/admin flows and a narrow viewport, but not every module, viewport, or failure state |
 
 Local validation is on Windows and does not establish Linux runtime
-compatibility. The GitHub Actions workflow now requests a hosted Linux run for
-typecheck, both test suites, production build, and all 12 function artifacts;
-that workflow has not yet run on GitHub.
+compatibility. The GitHub-hosted run for commit
+`928ac6c73a11717f74c43c0ec544b21f6d8f9971` passed on Ubuntu 24.04 x64 with
+Node.js 22.23.4 and npm 10.9.9. It passed `npm ci --include=optional`,
+Linux Argon2 verification, TypeScript, authentication tests (18/18), content
+tests, the production build, and packaging/import checks for all 12 Functions,
+including execution of packaged Linux Argon2. This hosted result predates the
+local Netlify CLI 27.16.2 upgrade and the `admin-content` Blobs assertion; a
+new hosted run is still needed for those changes.
 
 ## Explicitly unverified or limited
 
@@ -76,7 +83,8 @@ that workflow has not yet run on GitHub.
   against the service, and storage outage behavior.
 - Managed PostgreSQL connectivity, migration application, transaction and
   query behavior, imported-data preservation, and preview deployment.
-- GitHub-hosted Ubuntu execution of the extended CI workflow.
+- GitHub-hosted execution of the local CLI 27.16.2 upgrade and expanded
+  `admin-content` Blobs assertion.
 - End-to-end browser acceptance for all pages, dashboard modules, validation
   messages, accessibility, and responsive breakpoints.
 - Uploads are limited to 4 MiB. This is below some legacy PHP upload limits.
@@ -86,8 +94,9 @@ that workflow has not yet run on GitHub.
 
 ## Remaining work
 
-1. Run `.github/workflows/verify-linux-auth.yml` on a GitHub-hosted Ubuntu x64
-   runner after the branch is published; review all CI artifacts and logs.
+1. Re-run `.github/workflows/verify-linux-auth.yml` on a GitHub-hosted Ubuntu
+   x64 runner after the local CLI and assertion changes are published; review
+   all CI artifacts and logs.
 2. With explicit approval, use an isolated Netlify deploy preview and
    disposable managed PostgreSQL database to validate migrations, CRUD,
    contact throttling, and preserved-data assumptions.
